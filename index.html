@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Grain Cart Logger</title>
+  <style>
+    body { font-family: Arial; text-align: center; padding: 40px; }
+    #weight { font-size: 2em; margin: 20px; }
+    button { padding: 10px 20px; font-size: 1em; margin: 10px; }
+    table { margin: 20px auto; border-collapse: collapse; width: 80%; }
+    th, td { border: 1px solid #ccc; padding: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Grain Cart Logger</h1>
+  <div id="weight">Waiting for data...</div>
+  <button onclick="connectBLE()">Connect to ESP32</button>
+  <button onclick="logLoad()">Log Load</button>
+  <div id="status">Status: Not connected</div>
+
+  <h2>Logged Loads</h2>
+  <table id="logTable">
+    <tr><th>Weight</th><th>Timestamp</th><th>Status</th></tr>
+  </table>
+
+  <script>
+    let bleDevice;
+    let bleCharacteristic;
+    let lastWeight = "";
+    let logs = JSON.parse(localStorage.getItem("logs") || "[]");
+
+    function updateLogTable() {
+      const table = document.getElementById("logTable");
+      table.innerHTML = "<tr><th>Weight</th><th>Timestamp</th><th>Status</th></tr>";
+      logs.forEach(log => {
+        const row = table.insertRow();
+        row.insertCell(0).innerText = log.weight;
+        row.insertCell(1).innerText = log.timestamp;
+        row.insertCell(2).innerText = log.synced ? "Synced" : "Pending";
+      });
+    }
+
+    async function connectBLE() {
+      try {
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'GrainCartESP32' }],
+          optionalServices: ['12345678-1234-1234-1234-123456789abc']
+        });
+
+        const server = await bleDevice.gatt.connect();
+        const service = await server.getPrimaryService('12345678-1234-1234-1234-123456789abc');
+        bleCharacteristic = await service.getCharacteristic('abcd1234-ab12-cd34-ef56-abcdef123456');
+
+        await bleCharacteristic.startNotifications();
+        bleCharacteristic.addEventListener('characteristicvaluechanged', handleData);
+
+        document.getElementById("status").innerText = "Status: Connected";
+      } catch (error) {
+        console.error(error);
+        alert("BLE connection failed");
+      }
+    }
+
+    function handleData(event) {
+      const value = new TextDecoder().decode(event.target.value);
+      lastWeight = value;
+      document.getElementById("weight").innerText = value;
+    }
+
+    function logLoad() {
+      if (!lastWeight) {
+        alert("No weight data yet");
+        return;
+      }
+
+      const timestamp = new Date().toLocaleString();
+      const log = { weight: lastWeight, timestamp, synced: false };
+      logs.push(log);
+      localStorage.setItem("logs", JSON.stringify(logs));
+      updateLogTable();
+      document.getElementById("status").innerText = "Status: Load logged locally";
+
+      // Send to Google Apps Script
+      fetch("https://script.google.com/macros/s/AKfycbzXoVKrCk_8g_lURNH4VfFtYJ6Ihw9_9zM_TZKvsDDglcocr-fQJh1U2ZNQ0ZacAWEH/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          weight: log.weight,
+          timestamp: log.timestamp
+        })
+      })
+      .then(() => {
+        log.synced = true;
+        localStorage.setItem("logs", JSON.stringify(logs));
+        updateLogTable();
+        document.getElementById("status").innerText = "Status: Load synced to Google Sheets";
+      })
+      .catch(() => {
+        document.getElementById("status").innerText = "Status: Sync failed (offline?)";
+      });
+    }
+
+    updateLogTable();
+  </script>
+</body>
+</html>
