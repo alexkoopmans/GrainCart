@@ -10,24 +10,30 @@
     .status { margin-top: 10px; font-weight: bold; }
     .log-row:hover { background: #f9f9f9; }
     .delete-btn { color: red; cursor: pointer; float: right; }
+    .flex-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+    .button-row { display: flex; gap: 10px; margin-top: 10px; }
   </style>
 </head>
 <body>
   <h2>Grain Cart Logger</h2>
 
-  <label>Field Name:</label>
+  <label for="fieldName">Field Name:</label>
   <input type="text" id="fieldName" placeholder="Enter field name">
 
-  <label>Auto Log:</label>
-  <input type="checkbox" id="autoLogToggle">
+  <div class="flex-row">
+    <label for="autoLogToggle">Auto Log:</label>
+    <input type="checkbox" id="autoLogToggle">
+  </div>
 
   <button onclick="connectBLE()">Connect to ESP32</button>
   <div class="status" id="status">Status: Disconnected</div>
   <div class="status" id="weightDisplay">Weight: --</div>
   <div class="status" id="loadStatus"></div>
 
-  <button onclick="logLoad()">Log Load</button>
-  <button onclick="clearAllLogs()">Clear All Logs</button>
+  <div class="button-row">
+    <button onclick="logLoad()">Log Load</button>
+    <button onclick="clearAllLogs()">Clear All Logs</button> <!-- Remove this line if you want it gone -->
+  </div>
 
   <h3>Logged Loads</h3>
   <table id="logTable">
