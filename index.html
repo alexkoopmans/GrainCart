@@ -43,11 +43,27 @@
       font-size: 0.9em;
       color: #666;
     }
+
+    table {
+      margin: 30px auto;
+      border-collapse: collapse;
+      width: 80%;
+    }
+
+    th, td {
+      border: 1px solid #aaa;
+      padding: 8px;
+    }
+
+    th {
+      background-color: #ddd;
+    }
   </style>
 </head>
 <body>
   <h1>Grain Cart Logger</h1>
   <div id="weightDisplay">--</div>
+
   <div class="controls">
     <input type="text" id="fieldName" placeholder="Field name" />
     <button onclick="connectBLE()">Connect</button>
@@ -55,26 +71,8 @@
     <button onclick="toggleAutoLog()">Toggle Auto-Log</button>
     <button onclick="clearLogs()">Clear Logs</button>
   </div>
+
   <div id="status">Status: Disconnected</div>
 
-  <script>
-    let bleDevice;
-    let autoLog = false;
-    let lastLoggedWeight = null;
-
-    async function connectBLE() {
-      try {
-        bleDevice = await navigator.bluetooth.requestDevice({
-          filters: [{ services: ['your_service_uuid'] }]
-        });
-        const server = await bleDevice.gatt.connect();
-        const service = await server.getPrimaryService('your_service_uuid');
-        const characteristic = await service.getCharacteristic('your_characteristic_uuid');
-
-        characteristic.startNotifications();
-        characteristic.addEventListener('characteristicvaluechanged', handleWeightUpdate);
-
-        document.getElementById('status').textContent = 'Status: Connected';
-      } catch (error) {
-        console.error(error);
-        document
+  <h2>Log Chart</h2>
+  <table id="logTable">
