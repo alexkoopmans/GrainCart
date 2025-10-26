@@ -17,18 +17,40 @@
     }
 
     #weightDisplay {
-      font-size: 4em; /* 👈 Increased font size */
-      font-weight: bold; /* 👈 Bold for emphasis */
+      font-size: 4em;
+      font-weight: bold;
     }
 
     .controls {
       margin-top: 20px;
     }
 
-    .controls input, .controls button {
+    .controls input {
       font-size: 1em;
       padding: 10px;
       margin: 5px;
+    }
+
+    .controls button {
+      font-size: 1em;
+      padding: 10px 16px;
+      margin: 5px;
+    }
+
+    #logButton {
+      font-size: 1.2em;
+      padding: 12px 24px;
+      margin: 20px auto;
+      background-color: #007acc;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      display: block;
+    }
+
+    #logButton:hover {
+      background-color: #005fa3;
     }
 
     #status {
@@ -60,10 +82,11 @@
   <div class="controls">
     <input type="text" id="fieldName" placeholder="Field name" />
     <button onclick="connectBLE()">Connect</button>
-    <button onclick="logWeight()">Log Weight</button>
     <button onclick="toggleAutoLog()">Toggle Auto-Log</button>
     <button onclick="clearLogs()">Clear Logs</button>
   </div>
+
+  <button id="logButton" onclick="logWeight()">Log Weight</button>
 
   <div id="status">Status: Disconnected</div>
 
@@ -141,23 +164,4 @@
       document.getElementById('status').textContent = `Logged: ${weight} lbs in ${field}`;
 
       // Add to chart
-      const table = document.getElementById('logTable').querySelector('tbody');
-      const row = table.insertRow();
-      row.insertCell(0).textContent = new Date().toLocaleTimeString();
-      row.insertCell(1).textContent = weight;
-      row.insertCell(2).textContent = field;
-    }
-
-    function toggleAutoLog() {
-      autoLog = !autoLog;
-      document.getElementById('status').textContent = `Auto-Log: ${autoLog ? 'ON' : 'OFF'}`;
-    }
-
-    function clearLogs() {
-      lastLoggedWeight = null;
-      document.getElementById('status').textContent = 'Logs cleared';
-      document.getElementById('logTable').querySelector('tbody').innerHTML = '';
-    }
-  </script>
-</body>
-</html>
+      const table = document
