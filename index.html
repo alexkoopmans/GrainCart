@@ -58,3 +58,106 @@
   <div id="weightDisplay">--</div>
 
   <div class="controls">
+    <input type="text" id="fieldName" placeholder="Field name" />
+    <button onclick="connectBLE()">Connect</button>
+    <button onclick="logWeight()">Log Weight</button>
+    <button onclick="toggleAutoLog()">Toggle Auto-Log</button>
+    <button onclick="clearLogs()">Clear Logs</button>
+  </div>
+
+  <div id="status">Status: Disconnected</div>
+
+  <h2>Log Chart</h2>
+  <table id="logTable">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Weight (lbs)</th>
+        <th>Field</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    let bleDevice;
+    let autoLog = false;
+    let lastLoggedWeight = null;
+
+    async function connectBLE() {
+      try {
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ services: ['your_service_uuid'] }]
+        });
+        const server = await bleDevice.gatt.connect();
+        const service = await server.getPrimaryService('your_service_uuid');
+        const characteristic = await service.getCharacteristic('your_characteristic_uuid');
+
+        characteristic.startNotifications();
+        characteristic.addEventListener('characteristicvaluechanged', handleWeightUpdate);
+
+        document.getElementById('status').textContent = 'Status: Connected';
+      } catch (error) {
+        console.error(error);
+        document.getElementById('status').textContent = 'Status: Connection failed';
+      }
+    }
+
+    function handleWeightUpdate(event) {
+      const value = event.target.value;
+      const weight = parseWeight(value);
+      updateDisplay(weight);
+
+      if (autoLog && shouldLog(weight)) {
+        logWeight();
+      }
+    }
+
+    function parseWeight(dataView) {
+      return dataView.getUint16(0, true); // Adjust if your format differs
+    }
+
+    function updateDisplay(weight) {
+      document.getElementById('weightDisplay').textContent = weight;
+    }
+
+    function shouldLog(weight) {
+      return weight !== lastLoggedWeight && weight > 0;
+    }
+
+    function logWeight() {
+      const weight = document.getElementById('weightDisplay').textContent;
+      const field = document.getElementById('fieldName').value || 'Unknown';
+      lastLoggedWeight = weight;
+
+      // Send to Google Sheets
+      fetch('https://script.google.com/macros/s/your_webhook_id/exec', {
+        method: 'POST',
+        body: JSON.stringify({ weight, field }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      // Update status
+      document.getElementById('status').textContent = `Logged: ${weight} lbs in ${field}`;
+
+      // Add to chart
+      const table = document.getElementById('logTable').querySelector('tbody');
+      const row = table.insertRow();
+      row.insertCell(0).textContent = new Date().toLocaleTimeString();
+      row.insertCell(1).textContent = weight;
+      row.insertCell(2).textContent = field;
+    }
+
+    function toggleAutoLog() {
+      autoLog = !autoLog;
+      document.getElementById('status').textContent = `Auto-Log: ${autoLog ? 'ON' : 'OFF'}`;
+    }
+
+    function clearLogs() {
+      lastLoggedWeight = null;
+      document.getElementById('status').textContent = 'Logs cleared';
+      document.getElementById('logTable').querySelector('tbody').innerHTML = '';
+    }
+  </script>
+</body>
+</html>
