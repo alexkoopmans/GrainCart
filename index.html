@@ -1,4 +1,4 @@
-        <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -17,15 +17,8 @@
     }
 
     #weightDisplay {
-      font-size: 4em;
-      font-weight: bold;
-      color: #222;
-      background-color: #e0e0e0;
-      border: 3px solid #444;
-      padding: 20px 40px;
-      border-radius: 12px;
-      display: inline-block;
-      margin-bottom: 20px;
+      font-size: 4em; /* 👈 Increased font size */
+      font-weight: bold; /* 👈 Bold for emphasis */
     }
 
     .controls {
@@ -65,14 +58,3 @@
   <div id="weightDisplay">--</div>
 
   <div class="controls">
-    <input type="text" id="fieldName" placeholder="Field name" />
-    <button onclick="connectBLE()">Connect</button>
-    <button onclick="logWeight()">Log Weight</button>
-    <button onclick="toggleAutoLog()">Toggle Auto-Log</button>
-    <button onclick="clearLogs()">Clear Logs</button>
-  </div>
-
-  <div id="status">Status: Disconnected</div>
-
-  <h2>Log Chart</h2>
-  <table id="logTable">
