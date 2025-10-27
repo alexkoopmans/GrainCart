@@ -1,100 +1,149 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Grain Cart Logger</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 20px;
-      background: #f9f9f9;
-    }
-
-    h1 {
-      margin-bottom: 10px;
-    }
-
-    #weightDisplay {
-      font-size: 4em;
-      font-weight: bold;
-      margin-bottom: 20px;
-    }
-
-    .controls {
-      margin-top: 20px;
-    }
-
-    .controls input, .controls button {
-      font-size: 1em;
-      padding: 10px;
-      margin: 5px;
-    }
-
-    #status {
-      margin-top: 20px;
-      font-size: 0.9em;
-      color: #666;
-    }
-
-    table {
-      margin: 30px auto;
-      border-collapse: collapse;
-      width: 80%;
-    }
-
-    th, td {
-      border: 1px solid #aaa;
-      padding: 8px;
-    }
-
-    th {
-      background-color: #ddd;
-    }
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    input, button, select { margin: 5px 0; padding: 8px; width: 100%; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+    .status { margin-top: 10px; font-weight: bold; }
+    .log-row:hover { background: #f9f9f9; }
+    .delete-btn { color: red; cursor: pointer; float: right; }
+    .flex-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+    .button-row { display: flex; gap: 10px; margin-top: 10px; }
   </style>
 </head>
 <body>
-  <h1>Grain Cart Logger</h1>
-  <div id="weightDisplay">--</div>
+  <h2>Grain Cart Logger</h2>
 
-  <div class="controls">
-    <input type="text" id="fieldName" placeholder="Field name" />
-    <button id="connectBtn">Connect</button>
-    <button id="logBtn">Log Weight</button>
-    <button id="autoLogBtn">Toggle Auto-Log</button>
-    <button id="clearBtn">Clear Logs</button>
+  <label for="fieldName">Field Name:</label>
+  <input type="text" id="fieldName" placeholder="Enter field name">
+
+  <div class="flex-row">
+    <label for="autoLogToggle">Auto Log:</label>
+    <input type="checkbox" id="autoLogToggle">
   </div>
 
-  <div id="status">Status: Disconnected</div>
+  <button onclick="connectBLE()">Connect to ESP32</button>
+  <div class="status" id="status">Status: Disconnected</div>
+  <div class="status" id="weightDisplay">Weight: --</div>
+  <div class="status" id="loadStatus"></div>
 
-  <h2>Log Chart</h2>
+  <div class="button-row">
+    <button onclick="logLoad()">Log Load</button>
+    <button onclick="clearAllLogs()">Clear All Logs</button> <!-- Remove this line if you want it gone -->
+  </div>
+
+  <h3>Logged Loads</h3>
   <table id="logTable">
-    <thead>
-      <tr>
-        <th>Timestamp</th>
-        <th>Weight (lbs)</th>
-        <th>Field</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
+    <tr><th>Weight</th><th>Field</th><th>Time</th><th></th></tr>
   </table>
 
   <script>
-    let bleDevice = null;
-    let autoLog = false;
-    let lastLoggedWeight = null;
-    let characteristic = null;
+    let logs = JSON.parse(localStorage.getItem("logs") || "[]");
+    let currentField = localStorage.getItem("fieldName") || "";
+    let autoLogEnabled = false;
+    let lastWeights = [];
+    let cooldown = false;
 
-    document.getElementById('connectBtn').addEventListener('click', connectBLE);
-    document.getElementById('logBtn').addEventListener('click', logWeight);
-    document.getElementById('autoLogBtn').addEventListener('click', toggleAutoLog);
-    document.getElementById('clearBtn').addEventListener('click', clearLogs);
+    document.getElementById("fieldName").value = currentField;
+    document.getElementById("autoLogToggle").checked = autoLogEnabled;
+    document.getElementById("fieldName").addEventListener("input", e => {
+      currentField = e.target.value;
+      localStorage.setItem("fieldName", currentField);
+    });
+    document.getElementById("autoLogToggle").addEventListener("change", e => {
+      autoLogEnabled = e.target.checked;
+    });
+
+    function updateLogTable() {
+      const table = document.getElementById("logTable");
+      table.innerHTML = "<tr><th>Weight</th><th>Field</th><th>Time</th><th></th></tr>";
+      logs.forEach((log, i) => {
+        const row = table.insertRow();
+        row.className = "log-row";
+        row.insertCell(0).textContent = log.weight;
+        row.insertCell(1).textContent = log.field;
+        row.insertCell(2).textContent = log.timestamp;
+        const delCell = row.insertCell(3);
+        delCell.innerHTML = `<span class="delete-btn" onclick="deleteLog(${i})">🗑️</span>`;
+      });
+    }
+
+    function deleteLog(index) {
+      logs.splice(index, 1);
+      localStorage.setItem("logs", JSON.stringify(logs));
+      updateLogTable();
+    }
+
+    function clearAllLogs() {
+      if (confirm("Clear all logs?")) {
+        logs = [];
+        localStorage.removeItem("logs");
+        updateLogTable();
+      }
+    }
+
+    function logLoad(auto = false) {
+      const weight = lastWeights[lastWeights.length - 1] || 0;
+      const timestamp = new Date().toLocaleString();
+      const log = { weight, field: currentField, timestamp };
+      logs.push(log);
+      localStorage.setItem("logs", JSON.stringify(logs));
+      updateLogTable();
+      document.getElementById("loadStatus").textContent = auto ? "Auto-logged ✅" : "Logged ✅";
+
+      fetch("https://script.google.com/macros/s/AKfycbzXoVKrCk_8g_lURNH4VfFtYJ6Ihw9_9zM_TZKvsDDglcocr-fQJh1U2ZNQ0ZacAWEH/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ weight, field: currentField, timestamp })
+      });
+    }
 
     async function connectBLE() {
       try {
-        bleDevice = await navigator.bluetooth.requestDevice({
-          filters: [{ services: ['0000ffe0-0000-1000-8000-00805f9b34fb'] }] // Replace with your actual service UUID
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: "GrainCartESP32" }],
+          optionalServices: ["12345678-1234-1234-1234-123456789abc"]
         });
-        const server = await bleDevice.gatt.connect();
-        const service = await server.getPrimaryService('0000ffe0-0000-100
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService("12345678-1234-1234-1234-123456789abc");
+        const characteristic = await service.getCharacteristic("abcd1234-ab12-cd34-ef56-abcdef123456");
+
+        await characteristic.startNotifications();
+        characteristic.addEventListener("characteristicvaluechanged", handleWeightUpdate);
+        document.getElementById("status").textContent = "Status: Connected";
+      } catch (err) {
+        document.getElementById("status").textContent = "Status: Failed to connect";
+      }
+    }
+
+    function handleWeightUpdate(event) {
+      const value = event.target.value;
+      const weight = value.getInt32(0, true); // adjust if needed
+      document.getElementById("weightDisplay").textContent = `Weight: ${weight} lbs`;
+
+      lastWeights.push(weight);
+      if (lastWeights.length > 10) lastWeights.shift();
+
+      if (!autoLogEnabled || cooldown) return;
+
+      const recentChange = lastWeights[lastWeights.length - 1] - lastWeights[0];
+      const fluctuation = Math.max(...lastWeights) - Math.min(...lastWeights);
+
+      if (recentChange >= 500) {
+        document.getElementById("loadStatus").textContent = "Loading… 📦";
+      }
+
+      if (fluctuation < 50 && recentChange >= 500) {
+        document.getElementById("loadStatus").textContent = "Stable — Logging soon…";
+        cooldown = true;
+        setTimeout(() => { logLoad(true); cooldown = false; }, 2000);
+      }
+    }
+
+    updateLogTable();
+  </script>
+</body>
+</html>
