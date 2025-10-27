@@ -17,7 +17,7 @@
     }
 
     #weightDisplay {
-      font-size: 4em; /* 👈 Larger font size */
+      font-size: 4em;
       font-weight: bold;
       margin-bottom: 20px;
     }
@@ -60,10 +60,10 @@
 
   <div class="controls">
     <input type="text" id="fieldName" placeholder="Field name" />
-    <button onclick="connectBLE()">Connect</button>
-    <button onclick="logWeight()">Log Weight</button>
-    <button onclick="toggleAutoLog()">Toggle Auto-Log</button>
-    <button onclick="clearLogs()">Clear Logs</button>
+    <button id="connectBtn">Connect</button>
+    <button id="logBtn">Log Weight</button>
+    <button id="autoLogBtn">Toggle Auto-Log</button>
+    <button id="clearBtn">Clear Logs</button>
   </div>
 
   <div id="status">Status: Disconnected</div>
@@ -81,23 +81,20 @@
   </table>
 
   <script>
-    let bleDevice;
+    let bleDevice = null;
     let autoLog = false;
     let lastLoggedWeight = null;
+    let characteristic = null;
+
+    document.getElementById('connectBtn').addEventListener('click', connectBLE);
+    document.getElementById('logBtn').addEventListener('click', logWeight);
+    document.getElementById('autoLogBtn').addEventListener('click', toggleAutoLog);
+    document.getElementById('clearBtn').addEventListener('click', clearLogs);
 
     async function connectBLE() {
       try {
         bleDevice = await navigator.bluetooth.requestDevice({
-          filters: [{ services: ['your_service_uuid'] }]
+          filters: [{ services: ['0000ffe0-0000-1000-8000-00805f9b34fb'] }] // Replace with your actual service UUID
         });
         const server = await bleDevice.gatt.connect();
-        const service = await server.getPrimaryService('your_service_uuid');
-        const characteristic = await service.getCharacteristic('your_characteristic_uuid');
-
-        characteristic.startNotifications();
-        characteristic.addEventListener('characteristicvaluechanged', handleWeightUpdate);
-
-        document.getElementById('status').textContent = 'Status: Connected';
-      } catch (error) {
-        console.error(error);
-        document.getElementById('status').textContent = 'Status: Connection
+        const service = await server.getPrimaryService('0000ffe0-0000-100
