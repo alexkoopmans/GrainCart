@@ -17,53 +17,25 @@
     }
 
     #weightDisplay {
-      font-size: 4em;
+      font-size: 4em; /* 👈 Larger font size */
       font-weight: bold;
+      margin-bottom: 20px;
     }
 
     .controls {
       margin-top: 20px;
     }
 
-    .controls input {
+    .controls input, .controls button {
       font-size: 1em;
       padding: 10px;
       margin: 5px;
-    }
-
-    .controls button {
-      font-size: 1em;
-      padding: 10px 16px;
-      margin: 5px;
-    }
-
-    #logButton {
-      font-size: 1.2em;
-      padding: 12px 24px;
-      margin: 20px auto;
-      background-color: #007acc;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      display: block;
-    }
-
-    #logButton:hover {
-      background-color: #005fa3;
     }
 
     #status {
       margin-top: 20px;
       font-size: 0.9em;
       color: #666;
-    }
-
-    #autoLogStatus {
-      font-size: 1em;
-      margin-top: 5px;
-      font-weight: bold;
-      color: #007acc;
     }
 
     table {
@@ -89,8 +61,43 @@
   <div class="controls">
     <input type="text" id="fieldName" placeholder="Field name" />
     <button onclick="connectBLE()">Connect</button>
+    <button onclick="logWeight()">Log Weight</button>
     <button onclick="toggleAutoLog()">Toggle Auto-Log</button>
     <button onclick="clearLogs()">Clear Logs</button>
   </div>
 
-  <button id="logButton">
+  <div id="status">Status: Disconnected</div>
+
+  <h2>Log Chart</h2>
+  <table id="logTable">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Weight (lbs)</th>
+        <th>Field</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    let bleDevice;
+    let autoLog = false;
+    let lastLoggedWeight = null;
+
+    async function connectBLE() {
+      try {
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ services: ['your_service_uuid'] }]
+        });
+        const server = await bleDevice.gatt.connect();
+        const service = await server.getPrimaryService('your_service_uuid');
+        const characteristic = await service.getCharacteristic('your_characteristic_uuid');
+
+        characteristic.startNotifications();
+        characteristic.addEventListener('characteristicvaluechanged', handleWeightUpdate);
+
+        document.getElementById('status').textContent = 'Status: Connected';
+      } catch (error) {
+        console.error(error);
+        document.getElementById('status').textContent = 'Status: Connection
