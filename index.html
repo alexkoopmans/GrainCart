@@ -123,7 +123,7 @@
     function handleWeightUpdate(event) {
       const value = event.target.value;
       // FIXED: Changed from true (little-endian) to false (big-endian)
-      const weight = value.getInt32(0, false);
+      const weight = value.getInt32(0, true);
       
       console.log("Received weight:", weight); // Debug log
       document.getElementById("weightDisplay").textContent = `Weight: ${weight} lbs`;
@@ -151,3 +151,4 @@
   </script>
 </body>
 </html>
+
