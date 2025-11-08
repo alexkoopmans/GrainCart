@@ -122,17 +122,19 @@
 
 function handleWeightUpdate(event) {
   const value = event.target.value;
-  
-  // Read as STRING instead of int32
   const decoder = new TextDecoder('utf-8');
   const weightStr = decoder.decode(value);
-  const weight = parseInt(weightStr);
   
-  console.log("Received weight string:", weightStr, "Parsed:", weight);
-  document.getElementById("weightDisplay").textContent = `Weight: ${weight} lbs`;
-
-  lastWeights.push(weight);
-  if (lastWeights.length > 10) lastWeights.shift();
+  // Show the raw diagnostic message
+  document.getElementById("weightDisplay").textContent = `Weight: ${weightStr}`;
+  console.log("Received:", weightStr);
+  
+  // Try to parse if it's a number
+  const weight = parseInt(weightStr);
+  if (!isNaN(weight)) {
+    lastWeights.push(weight);
+    if (lastWeights.length > 10) lastWeights.shift();
+  }
 
   if (!autoLogEnabled || cooldown) return;
 
@@ -154,5 +156,6 @@ function handleWeightUpdate(event) {
   </script>
 </body>
 </html>
+
 
 
