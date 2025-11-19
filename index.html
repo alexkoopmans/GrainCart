@@ -44,7 +44,10 @@
     let logs = JSON.parse(localStorage.getItem("logs") || "[]");
     let currentField = localStorage.getItem("fieldName") || "";
     let autoLogEnabled = false;
-    let lastWeights = [];
+    let weightHistory = []; // Stores {weight, timestamp}
+    let loadingStartWeight = null;
+    let loadingStartTime = null;
+    let isCurrentlyLoading = false;
     let cooldown = false;
 
     document.getElementById("fieldName").value = currentField;
@@ -55,6 +58,14 @@
     });
     document.getElementById("autoLogToggle").addEventListener("change", e => {
       autoLogEnabled = e.target.checked;
+      // Reset state when toggling
+      if (autoLogEnabled) {
+        weightHistory = [];
+        loadingStartWeight = null;
+        loadingStartTime = null;
+        isCurrentlyLoading = false;
+        document.getElementById("loadStatus").textContent = "";
+      }
     });
 
     function updateLogTable() {
@@ -86,7 +97,7 @@
     }
 
     function logLoad(auto = false) {
-      const weight = lastWeights[lastWeights.length - 1] || 0;
+      const weight = weightHistory[weightHistory.length - 1]?.weight || 0;
       const timestamp = new Date().toLocaleString();
       const log = { weight, field: currentField, timestamp };
       logs.push(log);
@@ -115,47 +126,83 @@
         characteristic.addEventListener("characteristicvaluechanged", handleWeightUpdate);
         document.getElementById("status").textContent = "Status: Connected";
       } catch (err) {
-        console.error("BLE Connection Error:", err);
-        document.getElementById("status").textContent = "Status: Failed to connect - " + err.message;
+        document.getElementById("status").textContent = "Status: Failed to connect";
       }
     }
 
-function handleWeightUpdate(event) {
-  const value = event.target.value;
-  const decoder = new TextDecoder('utf-8');
-  const weightStr = decoder.decode(value);
-  
-  // Show the raw diagnostic message
-  document.getElementById("weightDisplay").textContent = `Weight: ${weightStr}`;
-  console.log("Received:", weightStr);
-  
-  // Try to parse if it's a number
-  const weight = parseInt(weightStr);
-  if (!isNaN(weight)) {
-    lastWeights.push(weight);
-    if (lastWeights.length > 10) lastWeights.shift();
-  }
+    function handleWeightUpdate(event) {
+      const value = event.target.value;
+      const decoder = new TextDecoder('utf-8');
+      const weightStr = decoder.decode(value);
+      const weight = parseInt(weightStr);
+      
+      if (isNaN(weight)) {
+        // Display diagnostic messages if not a number
+        document.getElementById("weightDisplay").textContent = `Weight: ${weightStr}`;
+        return;
+      }
 
-  if (!autoLogEnabled || cooldown) return;
+      document.getElementById("weightDisplay").textContent = `Weight: ${weight} lbs`;
 
-  const recentChange = lastWeights[lastWeights.length - 1] - lastWeights[0];
-  const fluctuation = Math.max(...lastWeights) - Math.min(...lastWeights);
+      const now = Date.now();
+      
+      // Add to history with timestamp
+      weightHistory.push({ weight, timestamp: now });
+      
+      // Keep only last 30 seconds of data
+      weightHistory = weightHistory.filter(entry => now - entry.timestamp < 30000);
 
-  if (recentChange >= 500) {
-    document.getElementById("loadStatus").textContent = "Loading… 📦";
-  }
+      if (!autoLogEnabled || cooldown) return;
 
-  if (fluctuation < 50 && recentChange >= 500) {
-    document.getElementById("loadStatus").textContent = "Stable — Logging soon…";
-    cooldown = true;
-    setTimeout(() => { logLoad(true); cooldown = false; }, 2000);
-  }
-}
+      // Get weights from different time windows
+      const weights3secAgo = weightHistory.filter(e => now - e.timestamp >= 3000);
+      const weights25secAgo = weightHistory.filter(e => now - e.timestamp >= 25000);
+      const weights10secAgo = weightHistory.filter(e => now - e.timestamp >= 10000);
+
+      // DETECT LOADING START
+      if (!isCurrentlyLoading && weights3secAgo.length > 0 && weights25secAgo.length > 0) {
+        const weight3secAgo = weights3secAgo[0].weight;
+        const weight25secAgo = weights25secAgo[0].weight;
+        const change3sec = weight - weight3secAgo;
+        const change25sec = weight - weight25secAgo;
+
+        // Must gain 2000+ lbs in 25 seconds, but NOT within 3 seconds (to avoid zero-out trigger)
+        if (change25sec >= 2000 && change3sec < 2000) {
+          isCurrentlyLoading = true;
+          loadingStartWeight = weight25secAgo;
+          loadingStartTime = now;
+          document.getElementById("loadStatus").textContent = "Loading detected... 📦";
+        }
+      }
+
+      // DETECT LOADING COMPLETE (stable weight)
+      if (isCurrentlyLoading && weights10secAgo.length > 0) {
+        const recentWeights = weightHistory.filter(e => now - e.timestamp <= 10000).map(e => e.weight);
+        const maxWeight = Math.max(...recentWeights);
+        const minWeight = Math.min(...recentWeights);
+        const fluctuation = maxWeight - minWeight;
+
+        // Stable if weight range is within 500 lbs over 10 seconds
+        if (fluctuation <= 500) {
+          document.getElementById("loadStatus").textContent = "Stable — Logging soon…";
+          cooldown = true;
+          isCurrentlyLoading = false;
+          loadingStartWeight = null;
+          loadingStartTime = null;
+          
+          setTimeout(() => { 
+            logLoad(true); 
+            cooldown = false; 
+          }, 2000);
+        } else {
+          // Still loading, show current gain
+          const currentGain = weight - loadingStartWeight;
+          document.getElementById("loadStatus").textContent = `Loading... +${currentGain} lbs 📦`;
+        }
+      }
+    }
 
     updateLogTable();
   </script>
 </body>
 </html>
-
-
-
